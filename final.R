@@ -23,13 +23,29 @@ agriculture <- agriculture %>%
 counties <- counties %>%
   select("NAME", "CALC_SQ_MI")
 #convert county area to acres
-counties$acre <- counties$CALC_SQ_MI * 640
+counties$total.acre <- counties$CALC_SQ_MI * 640
+
 #rename county name column
 counties <- counties %>%
   rename(County = NAME)
+#make counties County column uppercase
+counties <- counties %>%
+  mutate(County = toupper(County))
+#remove all periods in names
+agriculture$County <- gsub("\\.", "", agriculture$County)
+
 
 #join counties and agricultural datasets
-agriculture <- full_join(agriculture,
-                         counties,
-                         by = "County")
+ag.join <- left_join(agriculture,
+                     counties,
+                     by = c("County"))
+#select relevant columns
+ag.join <- ag.join %>%
+  select("County", "ag.acre", "total.acre")
+
+#add percent column
+#convert county area to acres
+ag.join$ag.percent <- (ag.join$ag.acre / ag.join$total.acre) * 100
+#round percentage to two decimals
+ag.join$ag.percent <- round(ag.join$ag.percent, 2)
 
