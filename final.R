@@ -1,4 +1,8 @@
 install.packages(c("ggplot2", "dplyr", "sf"))
+install.packages("stringr")
+install.packages("tidyr")
+library(stringr)
+library(tidyr)
 library(ggplot2)
 library(dplyr)
 library(sf)
@@ -8,6 +12,7 @@ biodiversity <- read.csv("/cloud/project/biodiversity.csv")
 agriculture <- read.csv("/cloud/project/agriculture.csv")
 counties <- st_read("/cloud/project/Counties_Shoreline.shp")
 
+###prepare agriculture and county datasets
 #get area of counties
 counties.area <- st_area(counties)
 
@@ -49,3 +54,29 @@ ag.join$ag.percent <- (ag.join$ag.acre / ag.join$total.acre) * 100
 #round percentage to two decimals
 ag.join$ag.percent <- round(ag.join$ag.percent, 2)
 
+###prepare biodiversity dataset
+unique(biodiversity$State.Conservation.Rank)
+
+biodiversity <- biodiversity %>%
+  select(County, Category, NY.Listing.Status, State.Conservation.Rank, Global.Conservation.Rank)
+
+#filter out ranking that conservation/diverisyt would not apply
+biodiversity <- biodiversity %>%
+  filter(!State.Conservation.Rank %in% c("SH", "SX", "SU", "SNR", "SNA"))
+
+biodiversity$State.Conservation.Rank <- str_replace(biodiversity$State.Conservation.Rank, "\\?","")
+
+#split the column into two new columns
+biodiversity <- biodiversity %>%
+  separate(State.Conservation.Rank, into = c("Rank1", "Rank2", "Rank3"), sep = "S", fill = "right")
+
+conversation_ranks <- separate(biodiversity, State.Conservation.Rank, into = c("Rank0", "Rank1", "Rank2","Rank3"), sep = "S", fill = "right", remove = FALSE) %>%
+  select(State.Conservation.Rank, Rank1, Rank2, Rank3)
+conversation_ranks <- conversation_ranks[!duplicated.data.frame(conversation_ranks),]
+write.csv(conversation_ranks, "conversation_ranks.csv")
+
+conversation_ranks <- read.csv("conversation_ranks.csv")
+biodiversity <- left_join(biodiversity, conversation_ranks, by = "State.Conservation.Rank")
+
+#biodiversity <- biodiversity %>%
+  #filter(str_detect(State.Conservation.Rank, "SH|SX|SU|SNR|SNA"))
