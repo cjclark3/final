@@ -1,6 +1,4 @@
-install.packages(c("ggplot2", "dplyr", "sf"))
-install.packages("stringr")
-install.packages("tidyr")
+install.packages(c("ggplot2", "dplyr", "sf", "stringr", "tidyr"))
 library(stringr)
 library(tidyr)
 library(ggplot2)
@@ -57,26 +55,19 @@ ag.join$ag.percent <- round(ag.join$ag.percent, 2)
 ###prepare biodiversity dataset
 unique(biodiversity$State.Conservation.Rank)
 
-biodiversity <- biodiversity %>%
-  select(County, Category, NY.Listing.Status, State.Conservation.Rank, Global.Conservation.Rank)
+#keep only needed columnns
+biodiversity.filtered <- biodiversity %>%
+  select(County, Category, State.Conservation.Rank)
 
-#filter out ranking that conservation/diverisyt would not apply
-biodiversity <- biodiversity %>%
-  filter(!State.Conservation.Rank %in% c("SH", "SX", "SU", "SNR", "SNA"))
-
-biodiversity$State.Conservation.Rank <- str_replace(biodiversity$State.Conservation.Rank, "\\?","")
-
-#split the column into two new columns
-biodiversity <- biodiversity %>%
-  separate(State.Conservation.Rank, into = c("Rank1", "Rank2", "Rank3"), sep = "S", fill = "right")
-
-conversation_ranks <- separate(biodiversity, State.Conservation.Rank, into = c("Rank0", "Rank1", "Rank2","Rank3"), sep = "S", fill = "right", remove = FALSE) %>%
+#sepaprate listed ranks for each species into different columns + save to new df
+conservation_ranks <- separate(biodiversity.filtered, State.Conservation.Rank, into = c("Rank0", "Rank1", "Rank2","Rank3"), sep = "S", fill = "right", remove = FALSE) %>%
   select(State.Conservation.Rank, Rank1, Rank2, Rank3)
-conversation_ranks <- conversation_ranks[!duplicated.data.frame(conversation_ranks),]
-write.csv(conversation_ranks, "conversation_ranks.csv")
+#eliminate duplicate ranks and save to csv
+conservation_ranks <- conservation_ranks[!duplicated.data.frame(conservation_ranks),]
+write.csv(conservation_ranks, "conservation_ranks.csv")
 
-conversation_ranks <- read.csv("conversation_ranks.csv")
-biodiversity <- left_join(biodiversity, conversation_ranks, by = "State.Conservation.Rank")
+#manually clean rank csv in excel, read in clean rank csv
+conservation_ranks_clean <- read.csv("/cloud/project/conservation_ranks_clean.csv")
+#join cleaned rank df and filtered biodiveristy df
+biodiversity.filtered.ranks <- left_join(biodiversity.filtered, conservation_ranks_clean, by = "State.Conservation.Rank")
 
-#biodiversity <- biodiversity %>%
-  #filter(str_detect(State.Conservation.Rank, "SH|SX|SU|SNR|SNA"))
