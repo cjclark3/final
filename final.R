@@ -15,10 +15,10 @@ counties <- st_read("/cloud/project/Counties_Shoreline.shp")
 counties.area <- st_area(counties)
 
 #select county and ag acre
-agriculture <- agriculture %>%
+agriculture.filtered <- agriculture %>%
   select("County", "Total.Acres.in.Agricultural.Districts")
 #sum all ag acreage by county
-agriculture <- agriculture %>%
+agriculture.filtered <- agriculture.filtered %>%
   group_by(County) %>%
   summarize(ag.acre = sum(Total.Acres.in.Agricultural.Districts))
 
@@ -35,11 +35,10 @@ counties <- counties %>%
 counties <- counties %>%
   mutate(County = toupper(County))
 #remove all periods in names
-agriculture$County <- gsub("\\.", "", agriculture$County)
-
+agriculture.filtered$County <- gsub("\\.", "", agriculture$County)
 
 #join counties and agricultural datasets
-ag.join <- left_join(agriculture,
+ag.join <- left_join(agriculture.filtered,
                      counties,
                      by = c("County"))
 #select relevant columns
@@ -70,4 +69,25 @@ write.csv(conservation_ranks, "conservation_ranks.csv")
 conservation_ranks_clean <- read.csv("/cloud/project/conservation_ranks_clean.csv")
 #join cleaned rank df and filtered biodiveristy df
 biodiversity.filtered.ranks <- left_join(biodiversity.filtered, conservation_ranks_clean, by = "State.Conservation.Rank")
+
+#rename rank columns
+biodiversity.filtered.ranks <- rename(biodiversity.filtered.ranks, BS.rank = Breeding.Species)
+biodiversity.filtered.ranks <- rename(biodiversity.filtered.ranks, NBS.rank = NonBreeding.Species)
+
+#calclate weighted biodiveristy score by county
+BFR.counties <- biodiversity.filtered.ranks %>%
+  group_by(County) %>%
+  summarize(county.biodiversity = mean(BS.rank + NBS.rank, na.rm = T))
+
+#make County column uppercase
+BFR.counties <- BFR.counties %>%
+  mutate(County = toupper(County))
+
+###join biodiversity and agricultural land use df by county, filter out counties without data for both
+bio.ag <- full_join(BFR.counties, ag.join, by = "County") %>%
+  filter(!is.na(ag.percent))
+
+###run analysis
+bio.ag.lm <- lm(county.biodiversity ~ ag.percent, data = bio.ag)
+summary(bio.ag.lm)
 
