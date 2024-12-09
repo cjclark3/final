@@ -1,4 +1,6 @@
 install.packages(c("ggplot2", "dplyr", "sf", "stringr", "tidyr", "PerformanceAnalytics", "olsrr"))
+install.packages("car")
+library(car)
 library(stringr)
 library(tidyr)
 library(ggplot2)
@@ -8,9 +10,9 @@ library(PerformanceAnalytics)
 library(olsrr)
 
 #load in data files
-biodiversity <- read.csv("/Users/clark/Downloads/biodiversity.csv")
-agriculture <- read.csv("/Users/clark/Downloads/agriculture.csv")
-counties <- st_read("/Users/clark/Downloads/NYS_Civil_Boundaries.shp/Counties_Shoreline.shp")
+biodiversity <- read.csv("/Users/clark/Downloads/325final/biodiversity.csv")
+agriculture <- read.csv("/Users/clark/Downloads/325final/agriculture.csv")
+counties <- st_read("/Users/clark/Downloads/325final/NYS_Civil_Boundaries.shp/Counties_Shoreline.shp")
 
 ###prepare agriculture and county datasets
 #get area of counties
@@ -56,7 +58,7 @@ ag.join$ag.percent <- round(ag.join$ag.percent, 2)
 ###prepare biodiversity dataset
 unique(biodiversity$State.Conservation.Rank)
 
-#keep only needed columnns
+#keep only needed columns
 biodiversity.filtered <- biodiversity %>%
   select(County, Category, State.Conservation.Rank)
 
@@ -64,7 +66,7 @@ biodiversity.filtered <- biodiversity %>%
 biodiversity.filtered <- biodiversity.filtered %>%
   mutate(County = toupper(County))
 
-#sepaprate listed ranks for each species into different columns + save to new df
+#separate listed ranks for each species into different columns + save to new df
 conservation_ranks <- separate(biodiversity.filtered, State.Conservation.Rank, into = c("Rank0", "Rank1", "Rank2","Rank3"), sep = "S", fill = "right", remove = FALSE) %>%
   select(State.Conservation.Rank, Rank1, Rank2, Rank3)
 #eliminate duplicate ranks and save to csv
@@ -72,7 +74,7 @@ conservation_ranks <- conservation_ranks[!duplicated.data.frame(conservation_ran
 write.csv(conservation_ranks, "conservation_ranks.csv")
 
 #manually clean rank csv in excel, read in clean rank csv
-conservation_ranks_clean <- read.csv("/cloud/project/conservation_ranks_clean.csv")
+conservation_ranks_clean <- read.csv("/Users/clark/Downloads/325final/conservation_ranks_clean.csv")
 
 #rename rank columns
 conservation_ranks_clean <- rename(conservation_ranks_clean, BS.rank = Breeding.Species)
@@ -138,7 +140,7 @@ bio.cat.ag <- full_join(biodiversity.cat.ranks, ag.join, by = "County") %>%
 
 ###run multiple regression to see if category impacts biodiversity
 bio.cat.ag.lm <- lm(county.biodiversity ~ animal +
-                      plant + natural_community +
+                      plant + #natural_community +
                       ag.percent,  data = bio.cat.ag) 
 summary(bio.cat.ag.lm)
 
@@ -155,9 +157,9 @@ plot(fit.bio.cat.ag,res.bio.cat.ag, pch=19)
 abline(h=0)
 
 #test for multicollinearity
-BCA.cat <- data.frame(bio.cat.ag$animal,
-                      bio.cat.ag$plant,
-                      bio.cat.ag$natural_community,
+BCA.cat <- data.frame(bio.cat.ag$plant,
+                      bio.cat.ag$animal,
+                      #bio.cat.ag$natural_community,
                       bio.cat.ag$ag.percent)
 
 #make a correlation matrix 
@@ -165,12 +167,28 @@ chart.Correlation(BCA.cat, histogram=TRUE, pch=19)
 
 #run stepwise to asses importance of variables
 BCA.step <- ols_step_forward_aic(bio.cat.ag.lm)
-# view table
-BCA.step 
 
-#plot linear regression
-ggplot(bio.ag, aes(x = ag.percent, y = county.biodiversity, color = County)) +
-  geom_point() + 
-  geom_smooth(method = "lm", se = TRUE, color = "red") + 
-  labs(x = "Agricultural Land Use (%)", y = "Biodiversity Score") +
+#view table
+BCA.step
+
+#check full model
+BCA.step$model
+
+#plot AIC over time
+plot(BCA.step)
+
+#generate partial regression plots
+crPlots(bio.cat.ag.lm)
+
+#check for collinearity
+alias(bio.cat.ag.lm)
+vif(bio.cat.ag.lm)
+
+#plot multiple linear regression variables
+ggplot(bio.cat.ag, aes(x = ag.percent, y = county.biodiversity, color = County)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, aes(group = 1)) +
+  facet_grid(factor(plant) ~ factor(animal), labeller = as_labeller(c('0' = "No", '1' = "Yes"))) +
+  labs(x = "Agricultural Land Use (%)",
+       y = "Biodiversity") +
   theme_minimal()
