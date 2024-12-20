@@ -1,5 +1,4 @@
-install.packages(c("ggplot2", "dplyr", "sf", "stringr", "tidyr", "PerformanceAnalytics", "olsrr"))
-install.packages("car")
+install.packages(c("ggplot2", "dplyr", "sf", "stringr", "tidyr", "PerformanceAnalytics", "olsrr", "car"))
 library(car)
 library(stringr)
 library(tidyr)
@@ -87,6 +86,9 @@ biodiversity.filtered.ranks <- left_join(biodiversity.filtered, conservation_ran
 BFR.counties <- biodiversity.filtered.ranks %>%
   group_by(County) %>%
   summarize(county.biodiversity = mean(BS.rank + NBS.rank, na.rm = T))
+
+#remove counties unknown observation
+BFR.counties <- BFR.counties[!(BFR.counties$County == "COUNTIES UNKNOWN"),]
 
 ###join biodiversity and agricultural land use df by county, filter out counties without data for both
 bio.ag <- full_join(BFR.counties, ag.join, by = "County") %>%
